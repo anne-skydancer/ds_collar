@@ -22,6 +22,8 @@
     <!-- Exclude OpenSim source directories from compilation -->
     <Compile Remove="extract\**\*.cs" />
     <Compile Remove="opensim_source\**\*.cs" />
+    <!-- SmokeTest is its own project (needs LibreMetaverse) -->
+    <Compile Remove="SmokeTest\**\*.cs" />
   </ItemGroup>
 
 </Project>

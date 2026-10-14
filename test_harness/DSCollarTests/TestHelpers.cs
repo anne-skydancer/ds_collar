@@ -127,13 +127,12 @@ public static class TestHelpers
     /// </summary>
     public static string LoadScript(string filename)
     {
-        // Pre-promotion validation: tests target src/lsl/collar/dev/ (the
-        // active development branch). Promotion pipeline is
-        // dev → experimental → ng → release-candidate → stable, so
-        // catching regressions before reconcile means validating dev/.
+        // Pre-promotion validation: tests target src/lsl/collar/v1.2/dev (the
+        // active development branch). Promotion pipeline is dev → rc → stable,
+        // so catching regressions before reconcile means validating dev/.
         string projectRoot = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
-            "..", "..", "..", "..", "src", "lsl", "collar", "dev"
+            "..", "..", "..", "..", "src", "lsl", "collar", "v1.2", "dev"
         ));
 
         string path = Path.Combine(projectRoot, filename);
