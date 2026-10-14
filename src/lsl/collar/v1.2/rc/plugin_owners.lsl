@@ -1,10 +1,11 @@
 /*--------------------
 PLUGIN: plugin_owners.lsl
 VERSION: 1.2
-REVISION: 22
+REVISION: 23
 PURPOSE: Owner, trustee, and honorific management workflows
 ARCHITECTURE: Consolidated message bus lanes, LSD policy-driven button visibility
 CHANGES:
+- v1.2 rev 23: retired the plugin's PRIVATE name resolver (own llRequestDisplayName + dataserver — a second resolver beside kmod_names, violating the single-authority design). get_name now: NameCache → same-region llGetDisplayName fast path (synchronous, unthrottled) → name.resolve to kmod_names on SETTINGS_BUS (PendingNames dedupes in-flight uuids) with llKey2Name as the immediate fallback; the name.resolved reply caches the composed label. Dropped ActiveNameQuery/ActiveQueryTarget + the dataserver event.
 - v1.2 rev 22: candidate avatar scan migrated to kmod_menu's menu.sensor service (like plugin_restrict force-sit). The plugin no longer runs its own llSensor: request_candidate_pick sends ui.menu.render {mode:menu.sensor,kind:agents,range:10} and the picked avatar returns via ui.sensor.result → handle_candidate_result → the accept prompt. Deleted start_scan + finish_scan + show_candidates + the sensor()/no_sensor() events + the CandidateKeys list + the acq_select branch. The honorific + remove-trustee LIST pickers stay on menu.picker (they provide an in-memory list, no scan). kmod_menu now owns the scan, range, and the "no people found" message.
 - v1.2 rev 21: MEMORY — all three picker item builds (candidate/honorific/remove-trustee) switched from `items +=` string concatenation to a row LIST joined ONCE via llDumpList2String. In-loop `+=` recopies the growing string each iteration (O(n²) transient garbage Mono doesn't reclaim mid-event) — the pattern that caused a stack-heap collision in plugin_leash (leash rev 16). Pre-emptive here.
 - v1.2 rev 20: reworked TRUSTEE_HONORIFICS to Sir/Miss/Madame/Monsieur/Lord/Lady (dropped Milord/Milady). 6 entries still single-page UL.
@@ -75,8 +76,7 @@ integer CandidateIsOwner;  // acquisition role: 1 = owner (set/transfer), 0 = tr
 integer OwnerConsents;     // exit flow: 1 = release (owner-authorized), 0 = runaway
 
 list NameCache;
-key ActiveNameQuery;
-key ActiveQueryTarget;
+list PendingNames;   // uuids sent to kmod_names, awaiting name.resolved (dedupe)
 
 list OWNER_HONORIFICS = ["Master", "Mistress", "Daddy", "Mommy", "King", "Queen"];
 list TRUSTEE_HONORIFICS = ["Sir", "Miss", "Madame", "Monsieur", "Lord", "Lady"];
@@ -143,23 +143,46 @@ cache_name(key k, string n) {
     }
 }
 
+// Off-region cache miss → delegate to kmod_names (the collar's single name
+// authority); the name.resolved reply lands in link_message and fills the cache.
+request_name(key k) {
+    if (llListFindList(PendingNames, [(string)k]) != -1) return;
+    PendingNames += [(string)k];
+    llMessageLinked(LINK_SET, SETTINGS_BUS, llList2Json(JSON_OBJECT, [
+        "type",      "name.resolve",
+        "requester", PLUGIN_CONTEXT,
+        "req_id",    "",
+        "uuids",     (string)k
+    ]), NULL_KEY);
+}
+
 string get_name(key k) {
     if (k == NULL_KEY) return "";
     integer idx = llListFindList(NameCache, [k]);
     if (idx != -1) return llList2String(NameCache, idx + 1);
 
+    // Same-region fast path: synchronous and unthrottled.
     string n = llGetDisplayName(k);
     if (n != "" && n != "???") {
         cache_name(k, n);
         return n;
     }
 
-    if (ActiveNameQuery == NULL_KEY) {
-        ActiveNameQuery = llRequestDisplayName(k);
-        ActiveQueryTarget = k;
-    }
-
+    request_name(k);
     return llKey2Name(k);
+}
+
+// name.resolved {requester, uuid, label} from kmod_names — cache the composed
+// label so the next get_name returns it.
+handle_name_resolved(string msg) {
+    if (llJsonGetValue(msg, ["requester"]) != PLUGIN_CONTEXT) return;
+    string uuid_str = llJsonGetValue(msg, ["uuid"]);
+    if (uuid_str == JSON_INVALID) return;
+    integer idx = llListFindList(PendingNames, [uuid_str]);
+    if (idx != -1) PendingNames = llDeleteSubList(PendingNames, idx, idx);
+    string label = llJsonGetValue(msg, ["label"]);
+    if (label == JSON_INVALID) return;
+    cache_name((key)uuid_str, label);
 }
 
 /* -------------------- LIFECYCLE -------------------- */
@@ -909,6 +932,7 @@ default {
                 // an unrelated sync never stacks a second dialog on an open menu.
                 if (CurrentUser != NULL_KEY && MenuContext == "await_sync") show_main();
             }
+            else if (type == "name.resolved") handle_name_resolved(msg);
         }
         else if (num == UI_BUS) {
             if (type == "ui.menu.start" && (llJsonGetValue(msg, ["context"]) != JSON_INVALID)) {
@@ -973,11 +997,5 @@ default {
 
     // Avatar scanning is owned by kmod_menu's menu.sensor service now (see
     // request_candidate_pick / handle_candidate_result); no sensor()/no_sensor() here.
-
-    dataserver(key qid, string data) {
-        if (qid != ActiveNameQuery) return;
-        if (data != "" && data != "???") cache_name(ActiveQueryTarget, data);
-        ActiveNameQuery = NULL_KEY;
-        ActiveQueryTarget = NULL_KEY;
-    }
+    // Name resolution is delegated to kmod_names (name.resolve/resolved); no dataserver here.
 }
