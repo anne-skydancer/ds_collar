@@ -7,7 +7,7 @@ namespace DSCollarTests;
 /// <summary>
 /// Tests for plugin_outfits.lsl — focused on the behavioral changes in
 /// rev 11 → rev 13: the three-phase Wear strip sequence and the
-/// ~outfits/~base folder naming convention. Drives apply_wear directly
+/// .outfits/.base folder naming convention. Drives apply_wear directly
 /// via InvokeFunction so the menu state machine doesn't have to be
 /// stood up just to exercise the RLV emission path.
 /// </summary>
@@ -36,13 +36,16 @@ public class OutfitsTests
     }
 
     /// <summary>
-    /// Wear must emit four rlv.force messages in this exact order:
-    ///   1. @detachallthis:~outfits=force       — clears the ~outfits subtree
-    ///   2. @remattach=force                    — attachments worn from outside ~outfits
-    ///   3. @remoutfit=force                    — clothing layers worn from outside ~outfits
-    ///   4. @attachall:~outfits/&lt;name&gt;=force    — attaches the chosen outfit
+    /// Wear must emit five rlv.force messages in this exact order:
+    ///   1. @detachallthis:.outfits=force       — clears the .outfits subtree
+    ///   2. @remattach=force                    — attachments worn from outside .outfits
+    ///   3. @remoutfit=force                    — clothing layers worn from outside .outfits
+    ///   4. @attachall:.outfits/&lt;name&gt;=force    — attaches the chosen outfit
+    ///   5. @attachall:.outfits/.base=force     — re-dresses base (base wins slot conflicts;
+    ///                                            '+' subfolders add, '~'/plain replace)
     /// Phase ordering matters: any attach issued before the strip completes
-    /// would have its items pulled off by the strip phases that follow.
+    /// would have its items pulled off by the strip phases that follow, and
+    /// base must attach after the outfit so it wins slot conflicts.
     /// </summary>
     [Test]
     public void TestApplyWear_EmitsThreePhaseStripThenAttach()
@@ -51,17 +54,19 @@ public class OutfitsTests
 
         var rlvCommands = ExtractRlvForceCommands(_harness.GetLinkMessages());
 
-        Assert.That(rlvCommands.Count, Is.EqualTo(4),
-            $"Expected 4 rlv.force commands, got {rlvCommands.Count}: [{string.Join(", ", rlvCommands)}]");
+        Assert.That(rlvCommands.Count, Is.EqualTo(5),
+            $"Expected 5 rlv.force commands, got {rlvCommands.Count}: [{string.Join(", ", rlvCommands)}]");
 
-        Assert.That(rlvCommands[0], Is.EqualTo("@detachallthis:~outfits=force"),
-            "Phase 1 must clear the ~outfits subtree first");
+        Assert.That(rlvCommands[0], Is.EqualTo("@detachallthis:.outfits=force"),
+            "Phase 1 must clear the .outfits subtree first");
         Assert.That(rlvCommands[1], Is.EqualTo("@remattach=force"),
-            "Phase 2 must strip outside-of-~outfits attachments");
+            "Phase 2 must strip outside-of-.outfits attachments");
         Assert.That(rlvCommands[2], Is.EqualTo("@remoutfit=force"),
-            "Phase 3 must strip outside-of-~outfits clothing layers");
-        Assert.That(rlvCommands[3], Is.EqualTo("@attachall:~outfits/Casual=force"),
+            "Phase 3 must strip outside-of-.outfits clothing layers");
+        Assert.That(rlvCommands[3], Is.EqualTo("@attachall:.outfits/Casual=force"),
             "Phase 4 attaches the chosen outfit AFTER the strip completes");
+        Assert.That(rlvCommands[4], Is.EqualTo("@attachall:.outfits/.base=force"),
+            "Phase 5 re-dresses .base AFTER the outfit so base wins slot conflicts");
     }
 
     /// <summary>
@@ -89,20 +94,22 @@ public class OutfitsTests
     }
 
     /// <summary>
-    /// Wear must reference the tilde-prefixed folder name (~outfits, not .outfits).
-    /// Guards against accidental regression of the rev 13 rename.
+    /// Wear must reference the dot-prefixed folder name (.outfits, not ~outfits).
+    /// The dot paradigm keeps the outfits tree hidden from @getinv/@getinvworn
+    /// listings (invisible to third-party RLV devices) while remaining
+    /// targetable by the collar's own commands on RLVa viewers.
     /// </summary>
     [Test]
-    public void TestApplyWear_UsesTildePrefixedFolderName()
+    public void TestApplyWear_UsesDotPrefixedFolderName()
     {
         _harness!.InvokeFunction("apply_wear", "BDSM");
 
         var rlvCommands = ExtractRlvForceCommands(_harness.GetLinkMessages());
 
-        Assert.That(rlvCommands, Has.Some.Contains("~outfits"),
-            "rlv.force commands must reference ~outfits (tilde-prefixed)");
-        Assert.That(rlvCommands, Has.None.Contains(".outfits"),
-            "rlv.force commands must NOT reference .outfits (legacy dot-prefix)");
+        Assert.That(rlvCommands, Has.Some.Contains(".outfits"),
+            "rlv.force commands must reference .outfits (dot-prefixed)");
+        Assert.That(rlvCommands, Has.None.Contains("~outfits"),
+            "rlv.force commands must NOT reference ~outfits (legacy tilde layout)");
     }
 
     /// <summary>
@@ -118,7 +125,7 @@ public class OutfitsTests
 
         Assert.That(rlvCommands.Count, Is.EqualTo(1),
             "Add is additive — must emit exactly one rlv.force command");
-        Assert.That(rlvCommands[0], Is.EqualTo("@attachallover:~outfits/Casual=force"),
+        Assert.That(rlvCommands[0], Is.EqualTo("@attachallover:.outfits/Casual=force"),
             "Add must use @attachallover to layer on top without kicking slot occupants");
     }
 

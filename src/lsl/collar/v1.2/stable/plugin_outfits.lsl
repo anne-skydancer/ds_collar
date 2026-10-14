@@ -1,7 +1,7 @@
 /*--------------------
 PLUGIN: plugin_outfits.lsl
 VERSION: 1.2
-REVISION: 18
+REVISION: 19
 PURPOSE: Browse #RLV/outfits subfolders and act on them. Four actions
          per outfit:
            Add    — attach the folder additively (layer on top)
@@ -50,6 +50,7 @@ ARCHITECTURE: Consolidated message bus lanes, LSD policy-driven button
              click and hides those items for the rest of the session.
              No shared shadow lock vector between plugins.
 CHANGES:
+- v1.2 rev 19: base re-dress (paradigm stays DOT). apply_wear re-dresses base AFTER the outfit attach: @attachall:.outfits/.base=force recurses its subfolders with spec-native prefix semantics — '+'-prefixed subfolders attach like @attachover (add, keeps slot occupants), '~'/plain subfolders replace (kicking the just-attached outfit item on a conflicting slot — base wins). Base protection is now two-layered: even if a blanket strip phase outruns the transient @detachallthis lock (same-object restriction enforcement and release ordering are viewer-dependent), the foundation always comes back complete. Dot retained deliberately: on RLVa — Firestorm and its descendants, effectively the whole RLV user base — dot folders are hidden from @getinv/@getinvworn listings yet fully targetable by force commands and folder locks (OpenCollar's .core/.outfits convention proves it in the wild), and the dot prefix keeps the tree invisible to third-party RLV devices; only on genuine RLV (Marine's, Kokua) do dot paths not bind. OUTFITS_SETUP.txt re-termed to match the code (it previously described ~outfits/~base).
 - v1.2 rev 18: picker action row is now "[Help]  [Close]" — Help label bracketed to match the [Stop]/[Close] fixed-button convention, plus a new [Close] fixed action (context "close" -> cleanup_session, exits the menu; Back still returns to root). Both always-shown (no mask), contiguous after nav.
 - v1.2 rev 17: fixed-row format follows kmod_menu rev 24 — "help\tHelp" (dropped the trailing slot field, which rev-24 render_picker would otherwise misread as an ACL mask and hide Help for most users). Help still always shows, contiguous after nav.
 - v1.2 rev 16: outfit picker migrated to menu.picker (central picker, kmod_menu rev 22). show_picker sends candidates as key-first rows "index\tname+mark\n..." + fixed "help\tHelp\t3"; kmod_menu owns the session, paging, and the click and replies ONE ui.menu.picker.result (handled on UI_BUS: cancelled -> root; "help" -> notecard + reshow same page; else index -> show_action). Dropped the plugin's "pick" MenuContext branch, the picker SessionId, LastMaxPage, and the whole {label}-wrap (real bracket/digit names now render for real via delimited transport, no JSON touches a label). The empty + per-outfit action menus stay plugin-owned menu.fixed (fixed labels).
@@ -404,6 +405,10 @@ apply_wear(string outfit_name) {
     rlv_force("@remattach=force");
     rlv_force("@remoutfit=force");
     rlv_force("@attachall:" + OUTFITS_ROOT + "/" + outfit_name + "=force");
+    // Base re-dress AFTER the outfit so base wins slot conflicts. @attachall
+    // recursion carries the subfolder prefix semantics: '+' folders attach
+    // like @attachover (add — keep occupants), '~'/plain folders replace.
+    rlv_force("@attachall:" + BASE_FOLDER + "=force");
     rlv_op("rlv.release", "detachallthis:" + BASE_FOLDER);
     llRegionSayTo(CurrentUser, 0, "Wearing: " + outfit_name);
 }

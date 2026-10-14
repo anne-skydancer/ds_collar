@@ -6,8 +6,8 @@ The Outfits menu reads from your #RLV shared folder. The folder
 layout the collar expects is:
 
     #RLV/
-        ~outfits/
-            ~base/       ← non-strippable base kit (REQUIRED)
+        .outfits/
+            .base/       ← non-strippable base kit (REQUIRED)
             Casual/      ← one folder per outfit
             Formal/
             BDSM/
@@ -15,27 +15,39 @@ layout the collar expects is:
 
 Two things must exist before the Outfits menu will work usefully:
 
-  1. #RLV/~outfits/               — the outfits library root
-  2. #RLV/~outfits/~base/         — the protected base kit subfolder
+  1. #RLV/.outfits/               — the outfits library root
+  2. #RLV/.outfits/.base/         — the protected base kit subfolder
 
-The tilde-prefixed naming is the "orthodox RLV" convention (also
-used by OpenCollar). It keeps these folders out of the way at the
-bottom of the inventory tree while still being visible to RLV
-enumeration commands — which is what lets the collar's Strip menu
-hide locked items from the picker before you ever click them.
+The dot-prefixed naming is deliberate. Dot-prefixed folders are
+hidden from RLV folder listings (@getinv / @getinvworn), so the
+outfits library stays invisible to the collar's Folders menu, to
+other people's RLV devices, and to folder-browsing traps — while
+remaining fully targetable by the collar's own RLV commands on
+RLVa viewers (Firestorm and its descendants), which is what nearly
+everyone uses. This is the same convention OpenCollar uses for its
+.outfits / .core folders.
+
+Note for genuine-RLV viewers (Marine's Restrained Love, Kokua):
+those viewers cannot target dot-prefixed folders at all, so folder
+locks do not bind there. The collar compensates by re-dressing
+your base kit after every outfit change — base items come back
+even if a strip phase catches them — but if you use one of these
+viewers, consider giving your permanent items explicit individual
+locks as well.
 
 -----------------------------------------------------------------
- If you are upgrading from an older collar build
+ If you followed an older version of this notecard
 -----------------------------------------------------------------
 
-Earlier builds used dot-prefixed names (.outfits / .outfits/.base).
-Those folders are no longer recognised — rename them:
+An earlier version of this notecard described a tilde layout
+(~outfits / ~outfits/~base). The collar does not use that layout —
+rename those folders if you created them:
 
-    .outfits          →  ~outfits
-    .outfits/.base    →  ~outfits/~base
+    ~outfits          →  .outfits
+    ~outfits/~base    →  .outfits/.base
 
 Right-click each folder in your inventory → Rename. Capitalisation
-and the exact spelling matter; the leading tilde (~) is required.
+and the exact spelling matter; the leading dot (.) is required.
 
 -----------------------------------------------------------------
  1. Make sure you have a #RLV shared folder
@@ -50,26 +62,27 @@ In Firestorm (or any RLV-capable viewer):
 If a #RLV folder already exists, skip this step.
 
 -----------------------------------------------------------------
- 2. Create #RLV/~outfits
+ 2. Create #RLV/.outfits
 -----------------------------------------------------------------
 
 Inside #RLV, create a subfolder named exactly:
 
-    ~outfits
+    .outfits
 
-(Yes, the leading tilde is required. It sorts the folder to the
-bottom of the inventory tree and signals "system folder, don't
-touch" to other RLV-aware tools.)
+The leading dot is required. It keeps the outfits library hidden
+from RLV folder listings, so it never appears in the collar's
+Folders menu and cannot be browsed or force-attached from by other
+people's RLV devices.
 
 -----------------------------------------------------------------
- 3. Create #RLV/~outfits/~base
+ 3. Create #RLV/.outfits/.base
 -----------------------------------------------------------------
 
-Inside #RLV/~outfits, create a subfolder named exactly:
+Inside #RLV/.outfits, create a subfolder named exactly:
 
-    ~base
+    .base
 
-Drop links to your "always on" items into ~base:
+Drop links to your "always on" items into .base:
 
   - Your body / mesh head
   - AO / animation overrider
@@ -78,25 +91,27 @@ Drop links to your "always on" items into ~base:
   - HUDs you always wear
 
 How to add a link: right-click an item in your inventory →
-"Copy", then in the ~base folder → "Paste as Link". Always link;
+"Copy", then in the .base folder → "Paste as Link". Always link;
 never move the original. RLV needs the link, not the item.
 
-The collar automatically locks #RLV/~outfits/~base with
-@detachallthis the moment the Outfits plugin is enabled, so
-nothing under ~base can be removed by the Strip menu, the Wear
-action, the Remove action, or any external relay — even if you
-forget to lock items individually.
+During a Wear, the collar holds a transient @detachallthis lock on
+.outfits/.base for the duration of its strip phases, and after the
+outfit attaches it re-dresses .base — so your base kit survives
+every outfit change and wins any attachment-slot conflict with the
+newly attached outfit. You do not need to lock anything in .base
+individually for the collar's own actions; explicit locks you set
+yourself (or another collar plugin sets) are respected as well.
 
 -----------------------------------------------------------------
- 4. Create one folder per outfit under #RLV/~outfits
+ 4. Create one folder per outfit under #RLV/.outfits
 -----------------------------------------------------------------
 
-Alongside ~base, create one subfolder per outfit. Each holds
-links to the items in that look. Example tree:
+Alongside .base, create one subfolder per outfit. Each holds links
+to the items in that look. Example tree:
 
     #RLV/
-        ~outfits/
-            ~base/
+        .outfits/
+            .base/
                 (body, AO, collar, jewelry — links)
             Casual/
                 (jeans, t-shirt, sneakers — links)
@@ -105,9 +120,30 @@ links to the items in that look. Example tree:
             BDSM/
                 (corset, cuffs, gag — links)
 
-The Outfits picker lists everything under ~outfits *except*
-folders whose names start with "." or "~", so ~base is hidden
+The Outfits picker lists everything under .outfits *except*
+folders whose names start with "." or "~", so .base is hidden
 from the picker even though it's protecting your kit.
+
+-----------------------------------------------------------------
+ Optional: subfolders inside .base (+add / ~replace)
+-----------------------------------------------------------------
+
+.base may contain subfolders. Every Wear ends by re-dressing
+.base recursively, and the subfolder name's first character
+decides how its items come back:
+
+    .outfits/
+        .base/
+            (items directly here: replace — base wins the slot)
+            +Jewelry/     ← "+" = add: layers on top, never kicks
+                             whatever the outfit put in that slot
+            ~Body/        ← "~" = replace: kicks a conflicting
+                             outfit item off the slot (base wins)
+
+Unprefixed subfolders behave like "~" (replace). The "+" behavior
+is the standard RLV folder convention (it makes the viewer attach
+that folder additively), so it also applies anywhere else you use
+it under .outfits.
 
 -----------------------------------------------------------------
  5. Using the Outfits menu
@@ -123,16 +159,18 @@ ACL level.
 
   Wear    — Replace. Strips worn unlocked items (attachments AND
             system clothing layers) in three phases:
-              1. @detachallthis:~outfits=force — clears ~outfits
+              1. @detachallthis:.outfits=force — clears .outfits
                  subtree
               2. @remattach=force — attachments worn from outside
-                 ~outfits (regular inventory, unlinked HUDs, etc.)
+                 .outfits (regular inventory, unlinked HUDs, etc.)
               3. @remoutfit=force — system clothing layers worn
-                 from outside ~outfits
-            Then attaches the chosen folder. Items under
-            #RLV/~outfits/~base are protected and survive every
-            phase, as does the collar itself and anything else
-            with an explicit lock.
+                 from outside .outfits
+            Then attaches the chosen folder, and finally re-dresses
+            .base (@attachall) so the foundation always comes back
+            complete — base items win any slot conflict with the
+            outfit just attached. Items under #RLV/.outfits/.base
+            are protected and survive every phase, as does the
+            collar itself and anything else with an explicit lock.
 
   Remove  — Detach this outfit's items. Blocked silently if the
             outfit is locked.
@@ -173,9 +211,9 @@ Locked outfits are marked with a "*" in the picker.
  Troubleshooting
 -----------------------------------------------------------------
 
-"No outfits found in #RLV/~outfits."
-    Either ~outfits doesn't exist yet, or it exists but holds no
-    outfit subfolders (only ~base counts as protected, not as an
+"No outfits found in #RLV/.outfits."
+    Either .outfits doesn't exist yet, or it exists but holds no
+    outfit subfolders (only .base counts as protected, not as an
     outfit). Create at least one regular subfolder (e.g. Casual)
     and put item links inside it.
 
@@ -186,8 +224,8 @@ Locked outfits are marked with a "*" in the picker.
 
 Outfit still won't change.
     Check capitalization on folder names — RLV is case-sensitive.
-    Make sure ~base is spelled exactly "~base" (with the leading
-    tilde) and lives directly under #RLV/~outfits, not somewhere
+    Make sure .base is spelled exactly ".base" (with the leading
+    dot) and lives directly under #RLV/.outfits, not somewhere
     else.
 
 Remove does nothing.
@@ -198,10 +236,8 @@ Remove does nothing.
 
 Strip menu still shows an item I expect to be locked.
     The collar pre-filters the Strip picker against every active
-    @detachallthis folder lock it can see. Foreign locks that
-    target dot-prefixed folders (legacy ".outfits/.base" or
-    private folders from other plugins) are invisible to the
-    pre-filter — those items show up once, fail silently when
-    clicked, and are hidden for the rest of the session. Tilde-
-    prefixed locks (including the collar's own ~outfits/~base)
-    are pre-filtered correctly and never appear.
+    @detachallthis folder lock the viewer can see. A lock on a
+    folder that is invisible to the viewer's folder API (for
+    example a dot-prefixed folder on a genuine-RLV viewer) cannot
+    be pre-filtered — those items show up once, fail silently when
+    clicked, and are hidden for the rest of the session.
